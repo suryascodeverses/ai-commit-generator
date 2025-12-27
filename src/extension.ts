@@ -1,26 +1,77 @@
-// The module 'vscode' contains the VS Code extensibility API
-// Import the module and reference it with the alias vscode in your code below
-import * as vscode from 'vscode';
+import * as vscode from "vscode";
+import { exec } from "child_process";
 
-// This method is called when your extension is activated
-// Your extension is activated the very first time the command is executed
+const EMPTY_TREE_HASH = "4b825dc642cb6eb9a060e54bf8d69288fbee4904";
+
 export function activate(context: vscode.ExtensionContext) {
+  const outputChannel = vscode.window.createOutputChannel(
+    "AI Commit Generator"
+  );
 
-	// Use the console to output diagnostic information (console.log) and errors (console.error)
-	// This line of code will only be executed once when your extension is activated
-	console.log('Congratulations, your extension "ai-commit-generator" is now active!');
+  const disposable = vscode.commands.registerCommand(
+    "ai-commit-generator.showStagedDiff",
+    async () => {
+      outputChannel.clear();
+      outputChannel.show(true);
 
-	// The command has been defined in the package.json file
-	// Now provide the implementation of the command with registerCommand
-	// The commandId parameter must match the command field in package.json
-	const disposable = vscode.commands.registerCommand('ai-commit-generator.helloWorld', () => {
-		// The code you place here will be executed every time your command is executed
-		// Display a message box to the user
-		vscode.window.showInformationMessage('Hello World from ai-commit-generator!');
-	});
+      const workspaceFolders = vscode.workspace.workspaceFolders;
+      if (!workspaceFolders || workspaceFolders.length === 0) {
+        vscode.window.showErrorMessage("No workspace folder is open.");
+        return;
+      }
 
-	context.subscriptions.push(disposable);
+      const workspacePath = workspaceFolders[0].uri.fsPath;
+
+      // 1️⃣ Resolve Git root
+      exec(
+        "git rev-parse --show-toplevel",
+        { cwd: workspacePath },
+        (rootErr, gitRootStdout) => {
+          if (rootErr) {
+            outputChannel.appendLine("❌ Not inside a Git repository.");
+            return;
+          }
+
+          const gitRoot = gitRootStdout.trim();
+
+          // 2️⃣ Check if HEAD exists
+          exec("git rev-parse --verify HEAD", { cwd: gitRoot }, (headErr) => {
+            const diffCommand = headErr
+              ? `git diff-index --cached ${EMPTY_TREE_HASH} --`
+              : "git diff-index --cached HEAD --";
+
+            // 3️⃣ Read staged changes
+            exec(
+              diffCommand,
+              { cwd: gitRoot, maxBuffer: 10 * 1024 * 1024 },
+              (diffErr, stdout, stderr) => {
+                if (diffErr) {
+                  outputChannel.appendLine("❌ Failed to read staged changes");
+                  outputChannel.appendLine(stderr || diffErr.message);
+                  return;
+                }
+
+                if (!stdout.trim()) {
+                  outputChannel.appendLine("ℹ️ No staged changes found.");
+                  return;
+                }
+
+                outputChannel.appendLine(
+                  headErr
+                    ? "=== STAGED CHANGES (INITIAL COMMIT) ==="
+                    : "=== STAGED CHANGES (INDEX vs HEAD) ==="
+                );
+
+                outputChannel.appendLine(stdout);
+              }
+            );
+          });
+        }
+      );
+    }
+  );
+
+  context.subscriptions.push(disposable);
 }
 
-// This method is called when your extension is deactivated
 export function deactivate() {}
