@@ -9,13 +9,39 @@
   "categories": [
     "Other"
   ],
-  "activationEvents": [],
+  "activationEvents": [
+    "*"
+  ],
   "main": "./dist/extension.js",
   "contributes": {
     "commands": [
       {
         "command": "ai-commit-generator.showStagedDiff",
         "title": "AI Commit Generator: Show Staged Diff"
+      },
+      {
+        "command": "ai-commit-generator.setOpenAIKey",
+        "title": "AI Commit Generator: Set OpenAI API Key"
+      },
+      {
+        "command": "ai-commit-generator.generateCommitMessage",
+        "title": "AI Commit Generator: Generate Commit Message (OpenAI)"
+      },
+      {
+        "command": "ai-commit-generator.setDeepSeekKey",
+        "title": "AI Commit Generator: Set DeepSeek API Key"
+      },
+      {
+        "command": "ai-commit-generator.generateCommitMessageDeepSeek",
+        "title": "AI Commit Generator: Generate Commit Message (DeepSeek)"
+      },
+      {
+        "command": "ai-commit-generator.setGeminiKey",
+        "title": "AI Commit Generator: Set Gemini API Key"
+      },
+      {
+        "command": "ai-commit-generator.generateCommitMessageGemini",
+        "title": "AI Commit Generator: Generate Commit Message (Gemini)"
       }
     ]
   },
@@ -34,15 +60,18 @@
     "test": "vscode-test"
   },
   "devDependencies": {
-    "@types/vscode": "^1.107.0",
     "@types/mocha": "^10.0.10",
     "@types/node": "22.x",
-    "typescript-eslint": "^8.48.1",
-    "eslint": "^9.39.1",
+    "@types/vscode": "^1.107.0",
+    "@vscode/test-cli": "^0.0.12",
+    "@vscode/test-electron": "^2.5.2",
     "esbuild": "^0.27.1",
+    "eslint": "^9.39.1",
     "npm-run-all": "^4.1.5",
     "typescript": "^5.9.3",
-    "@vscode/test-cli": "^0.0.12",
-    "@vscode/test-electron": "^2.5.2"
+    "typescript-eslint": "^8.48.1"
+  },
+  "dependencies": {
+    "@google/genai": "^1.34.0"
   }
 }
