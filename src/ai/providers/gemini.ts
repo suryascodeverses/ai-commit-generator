@@ -27,7 +27,13 @@ export class GeminiProvider implements LLMProvider {
 
     const result = await client.models.list();
 
-    const models = result.models ?? [];
+    const models = [];
+
+    // The Pager automatically fetches next pages as you iterate
+    for await (const model of result) {
+      models.push(model);
+      console.log(model.name);
+    }
 
     const usable = models.find(
       (m: { name?: string; supportedGenerationMethods?: string[] }) =>
