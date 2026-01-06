@@ -121,30 +121,45 @@ function buildSmartSummary(
   const renamed = files.filter((f) => f.status === "renamed");
   const formatting = files.filter((f) => f.isFormatting);
 
-  if (formatting.length > 0) {
-    parts.push(`Formatting: ${formatting.map((f) => f.path).join(", ")}`);
-  }
+  // Build file list with details
+  const fileList: string[] = [];
 
   if (added.length > 0) {
-    parts.push(`Added: ${added.map((f) => f.path).join(", ")}`);
+    added.forEach((f) => {
+      fileList.push(`  - ${f.path} (new file, +${f.additions} lines)`);
+    });
   }
 
   if (modified.length > 0) {
     const nonFormatting = modified.filter((f) => !f.isFormatting);
-    if (nonFormatting.length > 0) {
-      parts.push(`Modified: ${nonFormatting.map((f) => f.path).join(", ")}`);
-    }
+    nonFormatting.forEach((f) => {
+      fileList.push(
+        `  - ${f.path} (modified, +${f.additions}/-${f.deletions} lines)`
+      );
+    });
   }
 
   if (deleted.length > 0) {
-    parts.push(`Deleted: ${deleted.map((f) => f.path).join(", ")}`);
+    deleted.forEach((f) => {
+      fileList.push(`  - ${f.path} (deleted, -${f.deletions} lines)`);
+    });
   }
 
   if (renamed.length > 0) {
-    parts.push(`Renamed: ${renamed.map((f) => f.path).join(", ")}`);
+    renamed.forEach((f) => {
+      fileList.push(`  - ${f.path} (renamed)`);
+    });
   }
 
-  parts.push(`(+${insertions}, -${deletions} lines)`);
+  if (formatting.length > 0) {
+    formatting.forEach((f) => {
+      fileList.push(`  - ${f.path} (formatting only)`);
+    });
+  }
+
+  parts.push(`Files changed (${files.length}):`);
+  parts.push(...fileList);
+  parts.push(`\nTotal: +${insertions} insertions, -${deletions} deletions`);
 
   return parts.join("\n");
 }

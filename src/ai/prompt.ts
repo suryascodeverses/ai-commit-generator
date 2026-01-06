@@ -13,72 +13,109 @@ export function buildCommitPrompt(
   const style = options?.style || "concise";
   const maxLength = options?.maxLength || 72;
 
-  // If we have a summary, use it instead of full diff for large changes
+  // Build context from summary if available
+  let contextInfo = "";
+  if (summary) {
+    const added = summary.files.filter((f) => f.status === "added");
+    const deleted = summary.files.filter((f) => f.status === "deleted");
+    const modified = summary.files.filter((f) => f.status === "modified");
+    const formatting = summary.files.filter((f) => f.isFormatting);
+
+    contextInfo = `
+Context:
+- ${added.length} file(s) added: ${
+      added.map((f) => f.path).join(", ") || "none"
+    }
+- ${modified.length} file(s) modified: ${
+      modified.map((f) => f.path).join(", ") || "none"
+    }
+- ${deleted.length} file(s) deleted: ${
+      deleted.map((f) => f.path).join(", ") || "none"
+    }
+- ${formatting.length} file(s) reformatted: ${
+      formatting.map((f) => f.path).join(", ") || "none"
+    }
+`;
+  }
+
+  // Use truncated diff for large changes
   const changeDescription = summary?.isLarge
-    ? `Change Summary:\n${summary.summary}\n\nKey changes sample:\n${diff}`
-    : `Staged changes:\n${diff}`;
+    ? `${contextInfo}\n\nDiff sample (truncated):\n${diff}`
+    : `${contextInfo}\n\nFull diff:\n${diff}`;
 
   const stylePrompts = {
-    concise: `
-You are a Git commit message generator. Create a SHORT, single-line commit message.
+    concise: `You are analyzing git changes to write a commit message like GitHub Copilot does.
 
-RULES:
-- Maximum ${maxLength} characters
-- Use imperative mood: "Add", "Fix", "Update", "Remove"
-- Be specific about what changed
-- NO explanations, NO extra text
-- Output ONLY the commit message
+STRICT RULES:
+1. Analyze the ACTUAL changes in the diff - don't make things up
+2. Maximum ${maxLength} characters
+3. Format: "Action files/feature description"
+4. Use these action words based on what actually happened:
+   - "Add" for new files/features
+   - "Update" for modifications
+   - "Remove" or "Delete" for deletions
+   - "Fix" for bug fixes
+   - "Refactor" for code restructuring
+   - "Format" for formatting changes only
+5. Be SPECIFIC about what files/features changed
+6. NO prefixes like "feat:", "fix:" etc
+7. Output ONLY the commit message, nothing else
 
-EXAMPLES:
-- Add user login validation
-- Fix null pointer in payment handler
-- Update API response format
-- Remove deprecated config options
+REAL EXAMPLES from GitHub Copilot:
+- "Add README and initial text file for project documentation"
+- "Update user authentication logic in auth.ts"
+- "Remove deprecated config files"
+- "Fix null pointer exception in payment handler"
+- "Format code with prettier"
 
+ANALYZE THE CHANGES:
 ${changeDescription}
 
-Output ONLY the commit message:`,
+Based ONLY on what you see in the diff above, write the commit message:`,
 
-    conventional: `
-You are a Git commit message generator. Create a conventional commit message.
+    conventional: `You are analyzing git changes to write a conventional commit message.
 
-RULES:
-- Start with type: feat:, fix:, refactor:, docs:, style:, test:, chore:
-- Maximum ${maxLength} characters total
-- Use imperative mood
-- Be specific about what changed
-- NO explanations beyond the commit line
+STRICT RULES:
+1. Analyze the ACTUAL changes in the diff - don't make things up
+2. Format: "type: description"
+3. Types: feat, fix, docs, style, refactor, test, chore
+4. Maximum ${maxLength} characters total
+5. Be SPECIFIC about what changed
+6. Output ONLY the commit message
 
 EXAMPLES:
-- feat: Add OAuth2 authentication
-- fix: Resolve memory leak in cache
-- refactor: Extract validation to utils
-- docs: Update installation guide
-- style: Format code with prettier
+- "feat: Add user authentication module"
+- "fix: Resolve null pointer in payment handler"
+- "docs: Add README with setup instructions"
+- "style: Format code with prettier"
+- "refactor: Extract validation logic"
+- "chore: Update dependencies"
 
+ANALYZE THE CHANGES:
 ${changeDescription}
 
-Output ONLY the commit message:`,
+Based ONLY on what you see in the diff above, write the commit message:`,
 
-    detailed: `
-You are a Git commit message generator. Create a detailed commit message.
+    detailed: `You are analyzing git changes to write a detailed commit message.
 
 RULES:
-- First line: brief summary (max 72 chars)
-- Second line: empty
-- Following lines: detailed explanation
-- Use imperative mood
-- Explain WHAT and WHY
+1. First line: brief summary (max 72 chars)
+2. Second line: empty
+3. Following lines: bullet points explaining changes
+4. Be SPECIFIC about what changed
+5. Use imperative mood
 
 EXAMPLE:
-Add user authentication middleware
+Add user authentication system
 
-Implements JWT-based authentication to secure API endpoints.
-This adds login/logout handlers and token verification middleware.
+- Implement JWT-based authentication
+- Add login and logout endpoints
+- Create middleware for token verification
 
+ANALYZE THE CHANGES:
 ${changeDescription}
 
-Output the commit message:`,
+Based ONLY on what you see in the diff above, write the commit message:`,
   };
 
   return stylePrompts[style].trim();

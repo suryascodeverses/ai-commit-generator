@@ -91,9 +91,9 @@
           ],
           "default": "concise",
           "enumDescriptions": [
-            "Short, single-line commits (like GitHub Copilot)",
-            "Detailed commits with explanations",
-            "Conventional commits with type prefixes (feat:, fix:, etc.)"
+            "GitHub Copilot style - Natural language without prefixes (Add, Update, Fix, Remove...)",
+            "Conventional commits with type prefixes (feat:, fix:, docs:, etc.)",
+            "Detailed multi-line commits with explanations"
           ],
           "description": "Style of commit messages to generate"
         },

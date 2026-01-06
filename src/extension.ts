@@ -407,24 +407,31 @@ export function deactivate() {}
 async function setCommitStyle(context: vscode.ExtensionContext) {
   const styles = [
     {
-      label: "Concise",
-      description: "Short, single-line commits (like GitHub Copilot)",
+      label: "GitHub Copilot Style",
+      description:
+        "Natural language: Add, Update, Fix, Remove... (no prefixes)",
       value: "concise",
+      detail:
+        "Example: Add README and initial text file for project documentation",
     },
     {
-      label: "Conventional",
-      description: "With type prefixes (feat:, fix:, refactor:, etc.)",
+      label: "Conventional Commits",
+      description: "With type prefixes: feat:, fix:, docs:, style:, etc.",
       value: "conventional",
+      detail: "Example: feat: Add user authentication module",
     },
     {
-      label: "Detailed",
-      description: "Multi-line commits with explanations",
+      label: "Detailed Commits",
+      description: "Multi-line with bullet points explaining changes",
       value: "detailed",
+      detail: "Example: Add user auth\n\n- Implement JWT\n- Add endpoints",
     },
   ];
 
   const selected = await vscode.window.showQuickPick(styles, {
     placeHolder: "Select commit message style",
+    matchOnDescription: true,
+    matchOnDetail: true,
   });
 
   if (selected) {
