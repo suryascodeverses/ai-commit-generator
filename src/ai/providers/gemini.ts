@@ -1,10 +1,6 @@
 import { LLMProvider, GenerateCommitOptions } from "../llm";
 import { buildCommitPrompt } from "../prompt";
 
-/**
- * Gemini provider using official @google/genai SDK
- * Compatible with CommonJS (VS Code extensions)
- */
 export class GeminiProvider implements LLMProvider {
   readonly id = "gemini";
 
@@ -20,7 +16,6 @@ export class GeminiProvider implements LLMProvider {
     return this.client;
   }
 
-  /** Get list of all available models */
   async getAvailableModels(): Promise<
     Array<{ name: string; displayName: string }>
   > {
@@ -53,12 +48,16 @@ export class GeminiProvider implements LLMProvider {
   }
 
   async generateCommitMessage(options: GenerateCommitOptions): Promise<string> {
-    const prompt = buildCommitPrompt(options.diff);
-    const client = await this.getClient();
+    const prompt = buildCommitPrompt(options.diff, {
+      style: options.style || "concise",
+      maxLength: options.maxLength || 72,
+    });
 
+    const client = await this.getClient();
     const modelId = options.model || (await this.selectModel());
 
     console.log("🤖 Using model:", modelId);
+    console.log("✍️  Commit style:", options.style || "concise");
     console.log("📤 Sending prompt to Gemini...");
 
     const result = await client.models.generateContent({

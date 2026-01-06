@@ -32,12 +32,15 @@ export class ConfigViewProvider implements vscode.TreeDataProvider<ConfigItem> {
     }
 
     // Make items look clickable
+    const iconMap: Record<string, string> = {
+      "ai-commit-generator.setProvider": "symbol-interface",
+      "ai-commit-generator.setApiKey": "key",
+      "ai-commit-generator.setModel": "settings-gear",
+      "ai-commit-generator.setCommitStyle": "edit",
+    };
+
     treeItem.iconPath = new vscode.ThemeIcon(
-      element.command === "ai-commit-generator.setProvider"
-        ? "symbol-interface"
-        : element.command === "ai-commit-generator.setApiKey"
-        ? "key"
-        : "settings-gear"
+      iconMap[element.command || ""] || "settings-gear"
     );
 
     return treeItem;
@@ -51,6 +54,8 @@ export class ConfigViewProvider implements vscode.TreeDataProvider<ConfigItem> {
     const config = vscode.workspace.getConfiguration("aiCommitGenerator");
     const provider = config.get<string>("provider") || "gemini";
     const model = config.get<string>("model") || "auto";
+    const commitStyle = config.get<string>("commitStyle") || "concise";
+    const maxLength = config.get<number>("maxLength") || 72;
 
     // Check if API key is set
     const apiKey = await this.context.secrets.get(`${provider}-api-key`);
@@ -74,6 +79,12 @@ export class ConfigViewProvider implements vscode.TreeDataProvider<ConfigItem> {
         description: model,
         value: model,
         command: "ai-commit-generator.setModel",
+      },
+      {
+        label: "Commit Style",
+        description: commitStyle,
+        value: `${commitStyle} (max ${maxLength} chars)`,
+        command: "ai-commit-generator.setCommitStyle",
       },
     ];
   }

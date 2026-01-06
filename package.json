@@ -81,6 +81,28 @@
           "type": "string",
           "default": "",
           "description": "Model to use (leave empty for auto-selection)"
+        },
+        "aiCommitGenerator.commitStyle": {
+          "type": "string",
+          "enum": [
+            "concise",
+            "detailed",
+            "conventional"
+          ],
+          "default": "concise",
+          "enumDescriptions": [
+            "Short, single-line commits (like GitHub Copilot)",
+            "Detailed commits with explanations",
+            "Conventional commits with type prefixes (feat:, fix:, etc.)"
+          ],
+          "description": "Style of commit messages to generate"
+        },
+        "aiCommitGenerator.maxLength": {
+          "type": "number",
+          "default": 72,
+          "minimum": 50,
+          "maximum": 200,
+          "description": "Maximum length of commit message"
         }
       }
     }

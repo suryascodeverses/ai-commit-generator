@@ -33,6 +33,9 @@ export function activate(context: vscode.ExtensionContext) {
     ),
     vscode.commands.registerCommand("ai-commit-generator.setModel", () =>
       setModel(context)
+    ),
+    vscode.commands.registerCommand("ai-commit-generator.setCommitStyle", () =>
+      setCommitStyle(context)
     )
   );
 }
@@ -47,12 +50,16 @@ async function generateCommitMessage(context: vscode.ExtensionContext) {
     const config = vscode.workspace.getConfiguration("aiCommitGenerator");
     const provider = config.get<string>("provider") || "gemini";
     const model = config.get<string>("model") || "auto-select";
+    const commitStyle = config.get<string>("commitStyle") || "concise";
+    const maxLength = config.get<number>("maxLength") || 72;
 
     outputChannel.appendLine("=".repeat(60));
     outputChannel.appendLine("🚀 AI Commit Generator");
     outputChannel.appendLine("=".repeat(60));
     outputChannel.appendLine(`📍 Provider: ${provider}`);
     outputChannel.appendLine(`🤖 Model: ${model || "auto-select"}`);
+    outputChannel.appendLine(`✍️  Style: ${commitStyle}`);
+    outputChannel.appendLine(`📏 Max Length: ${maxLength}`);
     outputChannel.appendLine("");
 
     // Get API key
@@ -114,10 +121,12 @@ async function generateCommitMessage(context: vscode.ExtensionContext) {
         // Get provider instance
         const llmProvider = getProvider(provider, apiKey);
 
-        // Generate commit message
+        // Generate commit message with style options
         const message = await llmProvider.generateCommitMessage({
           diff,
           model: model || undefined,
+          style: commitStyle as any,
+          maxLength,
         });
 
         outputChannel.appendLine("");
@@ -126,6 +135,8 @@ async function generateCommitMessage(context: vscode.ExtensionContext) {
         outputChannel.appendLine("=".repeat(60));
         outputChannel.appendLine(message);
         outputChannel.appendLine("=".repeat(60));
+        outputChannel.appendLine("");
+        outputChannel.appendLine(`📊 Length: ${message.length} characters`);
 
         // Set commit message in source control input box
         repo.inputBox.value = message;
@@ -361,3 +372,56 @@ function getProvider(provider: string, apiKey: string): LLMProvider {
 }
 
 export function deactivate() {}
+
+async function setCommitStyle(context: vscode.ExtensionContext) {
+  const styles = [
+    {
+      label: "Concise",
+      description: "Short, single-line commits (like GitHub Copilot)",
+      value: "concise",
+    },
+    {
+      label: "Conventional",
+      description: "With type prefixes (feat:, fix:, refactor:, etc.)",
+      value: "conventional",
+    },
+    {
+      label: "Detailed",
+      description: "Multi-line commits with explanations",
+      value: "detailed",
+    },
+  ];
+
+  const selected = await vscode.window.showQuickPick(styles, {
+    placeHolder: "Select commit message style",
+  });
+
+  if (selected) {
+    const config = vscode.workspace.getConfiguration("aiCommitGenerator");
+    await config.update("commitStyle", selected.value, true);
+
+    // Ask for max length if needed
+    if (selected.value !== "detailed") {
+      const maxLength = await vscode.window.showInputBox({
+        prompt: "Maximum commit message length",
+        value: "72",
+        validateInput: (value) => {
+          const num = parseInt(value);
+          if (isNaN(num) || num < 50 || num > 200) {
+            return "Enter a number between 50 and 200";
+          }
+          return null;
+        },
+      });
+
+      if (maxLength) {
+        await config.update("maxLength", parseInt(maxLength), true);
+      }
+    }
+
+    configViewProvider.refresh();
+    vscode.window.showInformationMessage(
+      `Commit style set to ${selected.label}`
+    );
+  }
+}
