@@ -1,3 +1,4 @@
+// /src/ai/llm
 export interface GenerateCommitOptions {
   diff: string;
   maxLength?: number;

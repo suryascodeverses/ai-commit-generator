@@ -36,8 +36,8 @@ export class GeminiProvider implements LLMProvider {
     }
 
     const usable = models.find(
-      (m: { name?: string; supportedGenerationMethods?: string[] }) =>
-        m.name && m.supportedGenerationMethods?.includes("generateContent")
+      (m: { name?: string; supportedActions?: string[] }) =>
+        m.name && m.supportedActions?.includes("generateContent")
     );
 
     if (!usable?.name) {
