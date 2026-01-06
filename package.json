@@ -10,40 +10,80 @@
     "Other"
   ],
   "activationEvents": [
-    "*"
+    "onView:aiCommitConfig"
   ],
   "main": "./dist/extension.js",
   "contributes": {
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "ai-commit-container",
+          "title": "AI Commit Generator",
+          "icon": "resources/icon.svg"
+        }
+      ]
+    },
+    "views": {
+      "ai-commit-container": [
+        {
+          "id": "aiCommitConfig",
+          "name": "Configuration"
+        }
+      ]
+    },
     "commands": [
       {
-        "command": "ai-commit-generator.showStagedDiff",
-        "title": "AI Commit Generator: Show Staged Diff"
+        "command": "ai-commit-generator.generateCommit",
+        "title": "Generate AI Commit Message",
+        "icon": "$(sparkle)"
       },
       {
-        "command": "ai-commit-generator.setOpenAIKey",
-        "title": "AI Commit Generator: Set OpenAI API Key"
+        "command": "ai-commit-generator.openConfig",
+        "title": "Open AI Commit Configuration"
       },
       {
-        "command": "ai-commit-generator.generateCommitMessage",
-        "title": "AI Commit Generator: Generate Commit Message (OpenAI)"
+        "command": "ai-commit-generator.setProvider",
+        "title": "Set AI Provider"
       },
       {
-        "command": "ai-commit-generator.setDeepSeekKey",
-        "title": "AI Commit Generator: Set DeepSeek API Key"
+        "command": "ai-commit-generator.setApiKey",
+        "title": "Set API Key"
       },
       {
-        "command": "ai-commit-generator.generateCommitMessageDeepSeek",
-        "title": "AI Commit Generator: Generate Commit Message (DeepSeek)"
-      },
-      {
-        "command": "ai-commit-generator.setGeminiKey",
-        "title": "AI Commit Generator: Set Gemini API Key"
-      },
-      {
-        "command": "ai-commit-generator.generateCommitMessageGemini",
-        "title": "AI Commit Generator: Generate Commit Message (Gemini)"
+        "command": "ai-commit-generator.setModel",
+        "title": "Set Model"
       }
-    ]
+    ],
+    "menus": {
+      "scm/title": [
+        {
+          "command": "ai-commit-generator.generateCommit",
+          "group": "navigation",
+          "when": "scmProvider == git"
+        }
+      ]
+    },
+    "configuration": {
+      "title": "AI Commit Generator",
+      "properties": {
+        "aiCommitGenerator.provider": {
+          "type": "string",
+          "enum": [
+            "openai",
+            "deepseek",
+            "gemini",
+            "claude"
+          ],
+          "default": "gemini",
+          "description": "AI provider to use for commit message generation"
+        },
+        "aiCommitGenerator.model": {
+          "type": "string",
+          "default": "",
+          "description": "Model to use (leave empty for auto-selection)"
+        }
+      }
+    }
   },
   "scripts": {
     "vscode:prepublish": "npm run package",

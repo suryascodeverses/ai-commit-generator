@@ -8,25 +8,39 @@ export class OpenAIProvider implements LLMProvider {
 
   async generateCommitMessage(options: GenerateCommitOptions): Promise<string> {
     const prompt = buildCommitPrompt(options.diff);
+    const model = options.model || "gpt-3.5-turbo";
 
-    const res = await fetch("https://api.openai.com/v1/chat/completions", {
+    const response = await fetch("https://api.openai.com/v1/chat/completions", {
       method: "POST",
       headers: {
-        Authorization: `Bearer ${this.apiKey}`,
         "Content-Type": "application/json",
+        Authorization: `Bearer ${this.apiKey}`,
       },
       body: JSON.stringify({
-        model: "gpt-4o-mini",
-        messages: [{ role: "user", content: prompt }],
-        temperature: 0.3,
+        model,
+        messages: [
+          {
+            role: "user",
+            content: prompt,
+          },
+        ],
+        temperature: 0.7,
+        max_tokens: 500,
       }),
     });
 
-    if (!res.ok) {
-      throw new Error(`OpenAI API error: ${res.statusText}`);
+    if (!response.ok) {
+      const error = await response.text();
+      throw new Error(`OpenAI API error: ${error}`);
     }
 
-    const data: any = await res.json();
-    return data.choices[0].message.content.trim();
+    const data : any  = await response.json();
+    const message = data.choices?.[0]?.message?.content;
+
+    if (!message) {
+      throw new Error("OpenAI returned empty response");
+    }
+
+    return message.trim();
   }
 }

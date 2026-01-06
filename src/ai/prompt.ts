@@ -1,5 +1,3 @@
-// src/ai/prompt.ts
-
 export function buildCommitPrompt(diff: string): string {
   return `
 You are an expert software engineer.

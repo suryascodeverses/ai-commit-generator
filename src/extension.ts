@@ -1,293 +1,363 @@
 import * as vscode from "vscode";
-import { exec } from "child_process";
+import { ConfigViewProvider } from "./ui/configView";
+import { GeminiProvider } from "./ai/providers/gemini";
 import { OpenAIProvider } from "./ai/providers/openai";
 import { DeepSeekProvider } from "./ai/providers/deepseek";
-import { GeminiProvider } from "./ai/providers/gemini";
+import { ClaudeProvider } from "./ai/providers/claude";
+import { LLMProvider } from "./ai/llm";
 
-const EMPTY_TREE_HASH = "4b825dc642cb6eb9a060e54bf8d69288fbee4904";
-
-function getStagedDiff(workspacePath: string): Promise<string> {
-  return new Promise((resolve, reject) => {
-    exec(
-      "git rev-parse --show-toplevel",
-      { cwd: workspacePath },
-      (rootErr, gitRootStdout) => {
-        if (rootErr) {
-          reject("Not inside a Git repository.");
-          return;
-        }
-
-        const gitRoot = gitRootStdout.trim();
-
-        exec("git rev-parse --verify HEAD", { cwd: gitRoot }, (headErr) => {
-          const diffCommand = headErr
-            ? `git diff-index --cached ${EMPTY_TREE_HASH} --`
-            : "git diff-index --cached HEAD --";
-
-          exec(
-            diffCommand,
-            { cwd: gitRoot, maxBuffer: 10 * 1024 * 1024 },
-            (diffErr, stdout, stderr) => {
-              if (diffErr) {
-                reject(stderr || diffErr.message);
-                return;
-              }
-
-              if (!stdout.trim()) {
-                resolve("");
-                return;
-              }
-
-              resolve(stdout);
-            }
-          );
-        });
-      }
-    );
-  });
-}
+let configViewProvider: ConfigViewProvider;
 
 export function activate(context: vscode.ExtensionContext) {
+  console.log("AI Commit Generator is now active!");
+
+  // Register config view
+  configViewProvider = new ConfigViewProvider(context);
+  vscode.window.registerTreeDataProvider("aiCommitConfig", configViewProvider);
+
+  // Register commands
+  context.subscriptions.push(
+    vscode.commands.registerCommand("ai-commit-generator.generateCommit", () =>
+      generateCommitMessage(context)
+    ),
+    vscode.commands.registerCommand("ai-commit-generator.openConfig", () => {
+      vscode.commands.executeCommand(
+        "workbench.view.extension.ai-commit-container"
+      );
+    }),
+    vscode.commands.registerCommand("ai-commit-generator.setProvider", () =>
+      setProvider(context)
+    ),
+    vscode.commands.registerCommand("ai-commit-generator.setApiKey", () =>
+      setApiKey(context)
+    ),
+    vscode.commands.registerCommand("ai-commit-generator.setModel", () =>
+      setModel(context)
+    )
+  );
+}
+
+async function generateCommitMessage(context: vscode.ExtensionContext) {
   const outputChannel = vscode.window.createOutputChannel(
     "AI Commit Generator"
   );
+  outputChannel.show();
 
-  const disposable = vscode.commands.registerCommand(
-    "ai-commit-generator.showStagedDiff",
-    async () => {
-      outputChannel.clear();
-      outputChannel.show(true);
+  try {
+    const config = vscode.workspace.getConfiguration("aiCommitGenerator");
+    const provider = config.get<string>("provider") || "gemini";
+    const model = config.get<string>("model") || "auto-select";
 
-      const workspaceFolders = vscode.workspace.workspaceFolders;
-      if (!workspaceFolders || workspaceFolders.length === 0) {
-        vscode.window.showErrorMessage("No workspace folder is open.");
-        return;
-      }
+    outputChannel.appendLine("=".repeat(60));
+    outputChannel.appendLine("🚀 AI Commit Generator");
+    outputChannel.appendLine("=".repeat(60));
+    outputChannel.appendLine(`📍 Provider: ${provider}`);
+    outputChannel.appendLine(`🤖 Model: ${model || "auto-select"}`);
+    outputChannel.appendLine("");
 
-      try {
-        const diff = await getStagedDiff(workspaceFolders[0].uri.fsPath);
+    // Get API key
+    const apiKey = await context.secrets.get(`${provider}-api-key`);
+    if (!apiKey) {
+      const errorMsg = `No API key found for ${provider}. Please set it first.`;
+      outputChannel.appendLine(`❌ Error: ${errorMsg}`);
 
-        if (!diff) {
-          outputChannel.appendLine("ℹ️ No staged changes found.");
-          return;
-        }
-
-        outputChannel.appendLine("=== STAGED CHANGES ===");
-        outputChannel.appendLine(diff);
-      } catch (err: any) {
-        outputChannel.appendLine("❌ Failed to read staged changes");
-        outputChannel.appendLine(String(err));
-      }
-    }
-  );
-
-  const generateCommitDisposable = vscode.commands.registerCommand(
-    "ai-commit-generator.generateCommitMessage",
-    async () => {
-      const outputChannel = vscode.window.createOutputChannel(
-        "AI Commit Generator"
+      const action = await vscode.window.showErrorMessage(
+        errorMsg,
+        "Set API Key"
       );
-      outputChannel.clear();
-      outputChannel.show(true);
-
-      const apiKey = await context.secrets.get("openai.apiKey");
-      if (!apiKey) {
-        vscode.window.showErrorMessage(
-          "OpenAI API key not set. Run: AI Commit Generator: Set OpenAI API Key"
-        );
-        return;
+      if (action === "Set API Key") {
+        await setApiKey(context);
       }
+      return;
+    }
 
-      const workspaceFolders = vscode.workspace.workspaceFolders;
-      if (!workspaceFolders || workspaceFolders.length === 0) {
-        vscode.window.showErrorMessage("No workspace folder is open.");
-        return;
-      }
+    // Get git extension
+    const gitExtension = vscode.extensions.getExtension("vscode.git");
+    if (!gitExtension) {
+      outputChannel.appendLine("❌ Error: Git extension not found");
+      vscode.window.showErrorMessage("Git extension not found");
+      return;
+    }
 
-      try {
-        const diff = await getStagedDiff(workspaceFolders[0].uri.fsPath);
+    const git = gitExtension.exports.getAPI(1);
+    const repo = git.repositories[0];
 
-        if (!diff) {
-          vscode.window.showInformationMessage(
-            "No staged changes to generate commit message."
-          );
-          return;
-        }
+    if (!repo) {
+      outputChannel.appendLine("❌ Error: No Git repository found");
+      vscode.window.showErrorMessage("No Git repository found");
+      return;
+    }
 
-        const provider = new OpenAIProvider(apiKey);
+    // Get staged changes
+    outputChannel.appendLine("📦 Fetching staged changes...");
+    const diff = await repo.diff(true);
+    if (!diff || diff.trim().length === 0) {
+      outputChannel.appendLine("⚠️  Warning: No staged changes found");
+      vscode.window.showWarningMessage("No staged changes found");
+      return;
+    }
 
-        outputChannel.appendLine("🤖 Generating commit message...\n");
+    outputChannel.appendLine(
+      `✅ Found ${diff.split("\n").length} lines of changes`
+    );
+    outputChannel.appendLine("");
+    outputChannel.appendLine("🔄 Generating commit message...");
 
-        const message = await provider.generateCommitMessage({ diff });
+    // Show progress
+    await vscode.window.withProgress(
+      {
+        location: vscode.ProgressLocation.Notification,
+        title: `Generating commit message with ${provider}...`,
+        cancellable: false,
+      },
+      async () => {
+        // Get provider instance
+        const llmProvider = getProvider(provider, apiKey);
 
-        outputChannel.appendLine("=== GENERATED COMMIT MESSAGE ===\n");
+        // Generate commit message
+        const message = await llmProvider.generateCommitMessage({
+          diff,
+          model: model || undefined,
+        });
+
+        outputChannel.appendLine("");
+        outputChannel.appendLine("=".repeat(60));
+        outputChannel.appendLine("✅ GENERATED COMMIT MESSAGE:");
+        outputChannel.appendLine("=".repeat(60));
         outputChannel.appendLine(message);
-      } catch (err: any) {
-        outputChannel.appendLine("❌ Failed to generate commit message");
-        outputChannel.appendLine(String(err));
-      }
-    }
-  );
+        outputChannel.appendLine("=".repeat(60));
 
-  context.subscriptions.push(disposable);
-  context.subscriptions.push(generateCommitDisposable);
+        // Set commit message in source control input box
+        repo.inputBox.value = message;
 
-  const setKeyDisposable = vscode.commands.registerCommand(
-    "ai-commit-generator.setOpenAIKey",
-    async () => {
-      const key = await vscode.window.showInputBox({
-        prompt: "Enter your OpenAI API key",
-        password: true,
-        ignoreFocusOut: true,
-      });
-
-      if (!key) return;
-
-      await context.secrets.store("openai.apiKey", key);
-      vscode.window.showInformationMessage("OpenAI API key saved securely.");
-    }
-  );
-
-  context.subscriptions.push(setKeyDisposable);
-
-  const setDeepSeekKeyDisposable = vscode.commands.registerCommand(
-    "ai-commit-generator.setDeepSeekKey",
-    async () => {
-      const key = await vscode.window.showInputBox({
-        prompt: "Enter your DeepSeek API key",
-        password: true,
-        ignoreFocusOut: true,
-      });
-
-      if (!key) return;
-
-      await context.secrets.store("deepseek.apiKey", key);
-      vscode.window.showInformationMessage("DeepSeek API key saved securely.");
-    }
-  );
-
-  context.subscriptions.push(setDeepSeekKeyDisposable);
-
-  const generateDeepSeekDisposable = vscode.commands.registerCommand(
-    "ai-commit-generator.generateCommitMessageDeepSeek",
-    async () => {
-      const outputChannel = vscode.window.createOutputChannel(
-        "AI Commit Generator"
-      );
-      outputChannel.clear();
-      outputChannel.show(true);
-
-      const apiKey = await context.secrets.get("deepseek.apiKey");
-      if (!apiKey) {
-        vscode.window.showErrorMessage(
-          "DeepSeek API key not set. Run: AI Commit Generator: Set DeepSeek API Key"
-        );
-        return;
-      }
-
-      // ⬇️ reuse your already-working staged diff string
-      const workspaceFolders = vscode.workspace.workspaceFolders;
-      if (!workspaceFolders || workspaceFolders.length === 0) {
-        vscode.window.showErrorMessage("No workspace folder is open.");
-        return;
-      }
-
-      const diff = await getStagedDiff(workspaceFolders[0].uri.fsPath);
-
-      if (!diff) {
         vscode.window.showInformationMessage(
-          "No staged changes to generate commit message."
+          "✓ Commit message generated successfully!"
         );
-        return;
       }
+    );
+  } catch (error: any) {
+    outputChannel.appendLine("");
+    outputChannel.appendLine("❌ ERROR:");
+    outputChannel.appendLine(error.message);
+    outputChannel.appendLine("");
+    if (error.stack) {
+      outputChannel.appendLine("Stack trace:");
+      outputChannel.appendLine(error.stack);
+    }
 
-      try {
-        const provider = new DeepSeekProvider(apiKey);
+    vscode.window.showErrorMessage(
+      `Failed to generate commit message: ${error.message}`
+    );
+  }
+}
 
-        outputChannel.appendLine(
-          "🤖 Generating commit message (DeepSeek)...\n"
-        );
+async function setProvider(context: vscode.ExtensionContext) {
+  const providers = [
+    { label: "Gemini", value: "gemini" },
+    { label: "OpenAI", value: "openai" },
+    { label: "DeepSeek", value: "deepseek" },
+    { label: "Claude", value: "claude" },
+  ];
 
-        const message = await provider.generateCommitMessage({ diff });
+  const selected = await vscode.window.showQuickPick(providers, {
+    placeHolder: "Select AI provider",
+  });
 
-        outputChannel.appendLine("=== GENERATED COMMIT MESSAGE ===\n");
-        outputChannel.appendLine(message);
-      } catch (err: any) {
-        outputChannel.appendLine("❌ Failed to generate commit message");
-        outputChannel.appendLine(err.message);
+  if (selected) {
+    const config = vscode.workspace.getConfiguration("aiCommitGenerator");
+    await config.update("provider", selected.value, true);
+    configViewProvider.refresh();
+    vscode.window.showInformationMessage(`Provider set to ${selected.label}`);
+  }
+}
+
+async function setApiKey(context: vscode.ExtensionContext) {
+  const config = vscode.workspace.getConfiguration("aiCommitGenerator");
+  const provider = config.get<string>("provider") || "gemini";
+
+  const apiKey = await vscode.window.showInputBox({
+    prompt: `Enter your ${provider} API key`,
+    password: true,
+    placeHolder: "API key will be stored securely",
+  });
+
+  if (apiKey) {
+    await context.secrets.store(`${provider}-api-key`, apiKey);
+    configViewProvider.refresh();
+    vscode.window.showInformationMessage(`${provider} API key saved securely`);
+  }
+}
+
+async function setModel(context: vscode.ExtensionContext) {
+  const config = vscode.workspace.getConfiguration("aiCommitGenerator");
+  const provider = config.get<string>("provider") || "gemini";
+
+  // Get API key to fetch available models
+  const apiKey = await context.secrets.get(`${provider}-api-key`);
+  if (!apiKey) {
+    vscode.window.showErrorMessage(
+      `Please set ${provider} API key first before selecting a model.`
+    );
+    return;
+  }
+
+  let models: { label: string; value: string }[] = [];
+
+  try {
+    // Show loading
+    await vscode.window.withProgress(
+      {
+        location: vscode.ProgressLocation.Notification,
+        title: `Fetching available ${provider} models...`,
+        cancellable: false,
+      },
+      async () => {
+        const llmProvider = getProvider(provider, apiKey);
+
+        // Fetch models dynamically if provider supports it
+        if (provider === "gemini" && "getAvailableModels" in llmProvider) {
+          const geminiModels = await (llmProvider as any).getAvailableModels();
+          models = [
+            { label: "Auto-select (Recommended)", value: "" },
+            ...geminiModels.map((m: any) => ({
+              label: m.displayName || m.name,
+              value: m.name,
+            })),
+          ];
+        } else {
+          // Fallback to predefined models for other providers
+          switch (provider) {
+            case "openai":
+              models = [
+                { label: "GPT-4", value: "gpt-4" },
+                { label: "GPT-4 Turbo", value: "gpt-4-turbo-preview" },
+                { label: "GPT-3.5 Turbo", value: "gpt-3.5-turbo" },
+              ];
+              break;
+            case "deepseek":
+              models = [
+                { label: "DeepSeek Chat", value: "deepseek-chat" },
+                { label: "DeepSeek Coder", value: "deepseek-coder" },
+              ];
+              break;
+            case "claude":
+              models = [
+                {
+                  label: "Claude 3.5 Sonnet",
+                  value: "claude-3-5-sonnet-20241022",
+                },
+                { label: "Claude 3 Opus", value: "claude-3-opus-20240229" },
+                { label: "Claude 3 Haiku", value: "claude-3-haiku-20240307" },
+              ];
+              break;
+          }
+        }
       }
+    );
+
+    if (models.length === 0) {
+      vscode.window.showErrorMessage(
+        `No models found for ${provider}. Please check your API key.`
+      );
+      return;
     }
-  );
 
-  context.subscriptions.push(generateDeepSeekDisposable);
+    const selected = await vscode.window.showQuickPick(models, {
+      placeHolder: `Select model for ${provider}`,
+    });
 
-  const setGeminiKeyDisposable = vscode.commands.registerCommand(
-    "ai-commit-generator.setGeminiKey",
-    async () => {
-      const key = await vscode.window.showInputBox({
-        prompt: "Enter your Gemini API key",
-        password: true,
-        ignoreFocusOut: true,
-      });
+    if (selected !== undefined) {
+      await config.update("model", selected.value, true);
+      configViewProvider.refresh();
 
-      if (!key) return;
-
-      await context.secrets.store("gemini.apiKey", key);
-      vscode.window.showInformationMessage("Gemini API key saved securely.");
-    }
-  );
-
-  context.subscriptions.push(setGeminiKeyDisposable);
-
-  const generateGeminiDisposable = vscode.commands.registerCommand(
-    "ai-commit-generator.generateCommitMessageGemini",
-    async () => {
+      // Show output channel with selection
       const outputChannel = vscode.window.createOutputChannel(
         "AI Commit Generator"
       );
-      outputChannel.clear();
-      outputChannel.show(true);
+      outputChannel.appendLine(`✅ Model set to: ${selected.label}`);
+      outputChannel.appendLine(`   Provider: ${provider}`);
+      outputChannel.appendLine(
+        `   Model ID: ${selected.value || "auto-select"}`
+      );
+      outputChannel.show();
 
-      const apiKey = await context.secrets.get("gemini.apiKey");
-      if (!apiKey) {
-        vscode.window.showErrorMessage(
-          "Gemini API key not set. Run: AI Commit Generator: Set Gemini API Key"
-        );
-        return;
-      }
-
-      const workspaceFolders = vscode.workspace.workspaceFolders;
-      if (!workspaceFolders || workspaceFolders.length === 0) {
-        vscode.window.showErrorMessage("No workspace folder is open.");
-        return;
-      }
-
-      try {
-        const diff = await getStagedDiff(workspaceFolders[0].uri.fsPath);
-
-        if (!diff) {
-          vscode.window.showInformationMessage(
-            "No staged changes to generate commit message."
-          );
-          return;
-        }
-
-        const provider = new GeminiProvider(apiKey);
-
-        outputChannel.appendLine("🤖 Generating commit message (Gemini)...\n");
-
-        const message = await provider.generateCommitMessage({ diff });
-
-        outputChannel.appendLine("=== GENERATED COMMIT MESSAGE ===\n");
-        outputChannel.appendLine(message);
-      } catch (err: any) {
-        outputChannel.appendLine("❌ Failed to generate commit message");
-        outputChannel.appendLine(String(err));
-      }
+      vscode.window.showInformationMessage(
+        selected.value
+          ? `Model set to ${selected.label}`
+          : "Model set to auto-select"
+      );
     }
-  );
+  } catch (error: any) {
+    vscode.window.showErrorMessage(`Failed to fetch models: ${error.message}`);
+  }
+}
 
-  context.subscriptions.push(generateGeminiDisposable);
+// async function setModel(context: vscode.ExtensionContext) {
+//   const config = vscode.workspace.getConfiguration("aiCommitGenerator");
+//   const provider = config.get<string>("provider") || "gemini";
+
+//   let models: { label: string; value: string }[] = [];
+
+//   // Define available models per provider
+//   switch (provider) {
+//     case "gemini":
+//       models = [
+//         { label: "Auto-select (Recommended)", value: "" },
+//         { label: "Gemini 2.0 Flash", value: "gemini-2.0-flash-exp" },
+//         { label: "Gemini 1.5 Pro", value: "gemini-1.5-pro" },
+//         { label: "Gemini 1.5 Flash", value: "gemini-1.5-flash" },
+//       ];
+//       break;
+//     case "openai":
+//       models = [
+//         { label: "GPT-4", value: "gpt-4" },
+//         { label: "GPT-4 Turbo", value: "gpt-4-turbo-preview" },
+//         { label: "GPT-3.5 Turbo", value: "gpt-3.5-turbo" },
+//       ];
+//       break;
+//     case "deepseek":
+//       models = [
+//         { label: "DeepSeek Chat", value: "deepseek-chat" },
+//         { label: "DeepSeek Coder", value: "deepseek-coder" },
+//       ];
+//       break;
+//     case "claude":
+//       models = [
+//         { label: "Claude 3.5 Sonnet", value: "claude-3-5-sonnet-20241022" },
+//         { label: "Claude 3 Opus", value: "claude-3-opus-20240229" },
+//         { label: "Claude 3 Haiku", value: "claude-3-haiku-20240307" },
+//       ];
+//       break;
+//   }
+
+//   const selected = await vscode.window.showQuickPick(models, {
+//     placeHolder: `Select model for ${provider}`,
+//   });
+
+//   if (selected !== undefined) {
+//     await config.update("model", selected.value, true);
+//     configViewProvider.refresh();
+//     vscode.window.showInformationMessage(
+//       selected.value
+//         ? `Model set to ${selected.label}`
+//         : "Model set to auto-select"
+//     );
+//   }
+// }
+
+function getProvider(provider: string, apiKey: string): LLMProvider {
+  switch (provider) {
+    case "gemini":
+      return new GeminiProvider(apiKey);
+    case "openai":
+      return new OpenAIProvider(apiKey);
+    case "deepseek":
+      return new DeepSeekProvider(apiKey);
+    case "claude":
+      return new ClaudeProvider(apiKey);
+    default:
+      throw new Error(`Unknown provider: ${provider}`);
+  }
 }
 
 export function deactivate() {}

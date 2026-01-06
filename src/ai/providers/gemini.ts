@@ -8,11 +8,10 @@ import { buildCommitPrompt } from "../prompt";
 export class GeminiProvider implements LLMProvider {
   readonly id = "gemini";
 
-  private client: any; // SDK is loaded dynamically (ESM)
+  private client: any;
 
   constructor(private apiKey: string) {}
 
-  /** Lazy-load ESM-only SDK */
   private async getClient() {
     if (!this.client) {
       const mod = await import("@google/genai");
@@ -21,36 +20,46 @@ export class GeminiProvider implements LLMProvider {
     return this.client;
   }
 
-  /** Select first model that supports generateContent */
-  private async selectModel(): Promise<string> {
+  /** Get list of all available models */
+  async getAvailableModels(): Promise<
+    Array<{ name: string; displayName: string }>
+  > {
     const client = await this.getClient();
-
     const result = await client.models.list();
 
     const models = [];
-
-    // The Pager automatically fetches next pages as you iterate
     for await (const model of result) {
-      models.push(model);
-      console.log(model.name);
+      if (model.name && model.supportedActions?.includes("generateContent")) {
+        models.push({
+          name: model.name,
+          displayName: model.displayName || model.name,
+        });
+      }
     }
 
-    const usable = models.find(
-      (m: { name?: string; supportedActions?: string[] }) =>
-        m.name && m.supportedActions?.includes("generateContent")
-    );
+    console.log("📋 Available Gemini models:", models);
+    return models;
+  }
 
-    if (!usable?.name) {
+  private async selectModel(): Promise<string> {
+    const models = await this.getAvailableModels();
+
+    if (models.length === 0) {
       throw new Error("No Gemini models available for this API key.");
     }
 
-    return usable.name;
+    console.log("✅ Auto-selected model:", models[0].name);
+    return models[0].name;
   }
 
   async generateCommitMessage(options: GenerateCommitOptions): Promise<string> {
     const prompt = buildCommitPrompt(options.diff);
     const client = await this.getClient();
-    const modelId = await this.selectModel();
+
+    const modelId = options.model || (await this.selectModel());
+
+    console.log("🤖 Using model:", modelId);
+    console.log("📤 Sending prompt to Gemini...");
 
     const result = await client.models.generateContent({
       model: modelId,
@@ -67,6 +76,9 @@ export class GeminiProvider implements LLMProvider {
     if (!text) {
       throw new Error("Gemini returned empty response.");
     }
+
+    console.log("✅ Response received from Gemini");
+    console.log("📝 Generated message:", text.trim());
 
     return text.trim();
   }
