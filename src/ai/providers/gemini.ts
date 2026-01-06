@@ -48,16 +48,28 @@ export class GeminiProvider implements LLMProvider {
   }
 
   async generateCommitMessage(options: GenerateCommitOptions): Promise<string> {
-    const prompt = buildCommitPrompt(options.diff, {
-      style: options.style || "concise",
-      maxLength: options.maxLength || 72,
-    });
+    const prompt = buildCommitPrompt(
+      options.diff,
+      {
+        style: options.style || "concise",
+        maxLength: options.maxLength || 72,
+      },
+      options.summary
+    );
 
     const client = await this.getClient();
     const modelId = options.model || (await this.selectModel());
 
     console.log("🤖 Using model:", modelId);
     console.log("✍️  Commit style:", options.style || "concise");
+
+    if (options.summary?.isLarge) {
+      console.log("⚡ Large changeset detected - using smart summary");
+      console.log(
+        `📊 ${options.summary.filesChanged} files, +${options.summary.insertions}/-${options.summary.deletions}`
+      );
+    }
+
     console.log("📤 Sending prompt to Gemini...");
 
     const result = await client.models.generateContent({

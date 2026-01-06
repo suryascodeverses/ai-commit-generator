@@ -5,6 +5,7 @@ import { OpenAIProvider } from "./ai/providers/openai";
 import { DeepSeekProvider } from "./ai/providers/deepseek";
 import { ClaudeProvider } from "./ai/providers/claude";
 import { LLMProvider } from "./ai/llm";
+import { processDiff, truncateDiff } from "./ai/diffProcessor";
 
 let configViewProvider: ConfigViewProvider;
 
@@ -104,9 +105,28 @@ async function generateCommitMessage(context: vscode.ExtensionContext) {
       return;
     }
 
+    // Process diff intelligently
+    const diffSummary = processDiff(diff);
+
+    outputChannel.appendLine(`📊 Changes detected:`);
+    outputChannel.appendLine(`   Files: ${diffSummary.filesChanged}`);
+    outputChannel.appendLine(`   Insertions: +${diffSummary.insertions}`);
+    outputChannel.appendLine(`   Deletions: -${diffSummary.deletions}`);
     outputChannel.appendLine(
-      `✅ Found ${diff.split("\n").length} lines of changes`
+      `   Large changeset: ${diffSummary.isLarge ? "Yes" : "No"}`
     );
+
+    if (diffSummary.isLarge) {
+      outputChannel.appendLine("");
+      outputChannel.appendLine(
+        "⚡ Using smart diff summary (large changeset detected)"
+      );
+      outputChannel.appendLine(`📝 Summary:\n${diffSummary.summary}`);
+    }
+
+    // Truncate diff if too large
+    const processedDiff = diffSummary.isLarge ? truncateDiff(diff, 100) : diff;
+
     outputChannel.appendLine("");
     outputChannel.appendLine("🔄 Generating commit message...");
 
@@ -121,12 +141,13 @@ async function generateCommitMessage(context: vscode.ExtensionContext) {
         // Get provider instance
         const llmProvider = getProvider(provider, apiKey);
 
-        // Generate commit message with style options
+        // Generate commit message with smart processing
         const message = await llmProvider.generateCommitMessage({
-          diff,
+          diff: processedDiff,
           model: model || undefined,
           style: commitStyle as any,
           maxLength,
+          summary: diffSummary,
         });
 
         outputChannel.appendLine("");
@@ -151,7 +172,17 @@ async function generateCommitMessage(context: vscode.ExtensionContext) {
     outputChannel.appendLine("❌ ERROR:");
     outputChannel.appendLine(error.message);
     outputChannel.appendLine("");
+
+    // Better error messages for common issues
+    if (error.message.includes("quota") || error.message.includes("429")) {
+      outputChannel.appendLine("💡 TIP: Rate limit exceeded. Try:");
+      outputChannel.appendLine("   1. Wait a minute and try again");
+      outputChannel.appendLine("   2. Use a different model");
+      outputChannel.appendLine("   3. Switch to a different provider");
+    }
+
     if (error.stack) {
+      outputChannel.appendLine("");
       outputChannel.appendLine("Stack trace:");
       outputChannel.appendLine(error.stack);
     }

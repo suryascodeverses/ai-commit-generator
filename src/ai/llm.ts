@@ -1,8 +1,11 @@
+import { DiffSummary } from "./diffProcessor";
+
 export interface GenerateCommitOptions {
   diff: string;
   maxLength?: number;
   model?: string;
   style?: "concise" | "detailed" | "conventional";
+  summary?: DiffSummary;
 }
 
 export interface LLMProvider {

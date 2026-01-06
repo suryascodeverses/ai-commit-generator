@@ -1,3 +1,5 @@
+import { DiffSummary } from "./diffProcessor";
+
 export interface PromptOptions {
   style?: "concise" | "detailed" | "conventional";
   maxLength?: number;
@@ -5,10 +7,16 @@ export interface PromptOptions {
 
 export function buildCommitPrompt(
   diff: string,
-  options?: PromptOptions
+  options?: PromptOptions,
+  summary?: DiffSummary
 ): string {
   const style = options?.style || "concise";
   const maxLength = options?.maxLength || 72;
+
+  // If we have a summary, use it instead of full diff for large changes
+  const changeDescription = summary?.isLarge
+    ? `Change Summary:\n${summary.summary}\n\nKey changes sample:\n${diff}`
+    : `Staged changes:\n${diff}`;
 
   const stylePrompts = {
     concise: `
@@ -27,8 +35,7 @@ EXAMPLES:
 - Update API response format
 - Remove deprecated config options
 
-Staged changes:
-${diff}
+${changeDescription}
 
 Output ONLY the commit message:`,
 
@@ -47,9 +54,9 @@ EXAMPLES:
 - fix: Resolve memory leak in cache
 - refactor: Extract validation to utils
 - docs: Update installation guide
+- style: Format code with prettier
 
-Staged changes:
-${diff}
+${changeDescription}
 
 Output ONLY the commit message:`,
 
@@ -69,14 +76,10 @@ Add user authentication middleware
 Implements JWT-based authentication to secure API endpoints.
 This adds login/logout handlers and token verification middleware.
 
-Staged changes:
-${diff}
+${changeDescription}
 
 Output the commit message:`,
   };
 
   return stylePrompts[style].trim();
 }
-
-// Backward compatibility
-export { buildCommitPrompt as default };
