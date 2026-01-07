@@ -1,5 +1,6 @@
 import { LLMProvider, GenerateCommitOptions } from "../llm";
 import { buildCommitPrompt } from "../prompt";
+import { logger } from "../../utils/logger";
 
 export class OpenAIProvider implements LLMProvider {
   readonly id = "openai";
@@ -10,6 +11,8 @@ export class OpenAIProvider implements LLMProvider {
     Array<{ name: string; displayName: string }>
   > {
     try {
+      logger.debug("Fetching OpenAI models...");
+
       const response = await fetch("https://api.openai.com/v1/models", {
         method: "GET",
         headers: {
@@ -23,7 +26,6 @@ export class OpenAIProvider implements LLMProvider {
 
       const data: any = await response.json();
 
-      // Filter for GPT models only
       const gptModels = data.data
         .filter((m: any) => m.id.includes("gpt"))
         .map((m: any) => ({
@@ -31,11 +33,11 @@ export class OpenAIProvider implements LLMProvider {
           displayName: m.id,
         }));
 
-      console.log("📋 Available OpenAI models:", gptModels);
+      logger.debug(`Available OpenAI models: ${gptModels.length}`);
       return gptModels;
     } catch (error: any) {
-      console.error("Failed to fetch OpenAI models:", error);
-      // Return default models as fallback
+      logger.error("Failed to fetch OpenAI models, using fallback list", error);
+
       return [
         { name: "gpt-4o", displayName: "GPT-4o" },
         { name: "gpt-4o-mini", displayName: "GPT-4o Mini" },
@@ -57,17 +59,15 @@ export class OpenAIProvider implements LLMProvider {
 
     const model = options.model || "gpt-4o-mini";
 
-    console.log("🤖 Using model:", model);
-    console.log("✍️  Commit style:", options.style || "concise");
+    logger.info(`Using OpenAI model: ${model}`);
 
     if (options.summary?.isLarge) {
-      console.log("⚡ Large changeset detected - using smart summary");
-      console.log(
-        `📊 ${options.summary.filesChanged} files, +${options.summary.insertions}/-${options.summary.deletions}`
+      logger.info(
+        `Processing large changeset: ${options.summary.filesChanged} files`
       );
     }
 
-    console.log("📤 Sending prompt to OpenAI...");
+    logger.debug("Sending request to OpenAI API...");
 
     const response = await fetch("https://api.openai.com/v1/chat/completions", {
       method: "POST",
@@ -90,6 +90,7 @@ export class OpenAIProvider implements LLMProvider {
 
     if (!response.ok) {
       const error = await response.text();
+      logger.error("OpenAI API request failed", error);
       throw new Error(`OpenAI API error: ${error}`);
     }
 
@@ -97,12 +98,11 @@ export class OpenAIProvider implements LLMProvider {
     const message = data.choices?.[0]?.message?.content;
 
     if (!message) {
+      logger.error("OpenAI returned empty response");
       throw new Error("OpenAI returned empty response");
     }
 
-    console.log("✅ Response received from OpenAI");
-    console.log("📝 Generated message:", message.trim());
-
+    logger.debug("Response received from OpenAI");
     return message.trim();
   }
 }

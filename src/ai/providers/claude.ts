@@ -1,5 +1,6 @@
 import { LLMProvider, GenerateCommitOptions } from "../llm";
 import { buildCommitPrompt } from "../prompt";
+import { logger } from "../../utils/logger";
 
 export class ClaudeProvider implements LLMProvider {
   readonly id = "claude";
@@ -9,7 +10,6 @@ export class ClaudeProvider implements LLMProvider {
   async getAvailableModels(): Promise<
     Array<{ name: string; displayName: string }>
   > {
-    // Claude has fixed models
     const models = [
       { name: "claude-3-5-sonnet-20241022", displayName: "Claude 3.5 Sonnet" },
       { name: "claude-3-5-haiku-20241022", displayName: "Claude 3.5 Haiku" },
@@ -18,7 +18,7 @@ export class ClaudeProvider implements LLMProvider {
       { name: "claude-3-haiku-20240307", displayName: "Claude 3 Haiku" },
     ];
 
-    console.log("📋 Available Claude models:", models);
+    logger.debug(`Available Claude models: ${models.length}`);
     return models;
   }
 
@@ -34,17 +34,15 @@ export class ClaudeProvider implements LLMProvider {
 
     const model = options.model || "claude-3-5-sonnet-20241022";
 
-    console.log("🤖 Using model:", model);
-    console.log("✍️  Commit style:", options.style || "concise");
+    logger.info(`Using Claude model: ${model}`);
 
     if (options.summary?.isLarge) {
-      console.log("⚡ Large changeset detected - using smart summary");
-      console.log(
-        `📊 ${options.summary.filesChanged} files, +${options.summary.insertions}/-${options.summary.deletions}`
+      logger.info(
+        `Processing large changeset: ${options.summary.filesChanged} files`
       );
     }
 
-    console.log("📤 Sending prompt to Claude...");
+    logger.debug("Sending request to Claude API...");
 
     const response = await fetch("https://api.anthropic.com/v1/messages", {
       method: "POST",
@@ -67,6 +65,7 @@ export class ClaudeProvider implements LLMProvider {
 
     if (!response.ok) {
       const error = await response.text();
+      logger.error("Claude API request failed", error);
       throw new Error(`Claude API error: ${error}`);
     }
 
@@ -74,12 +73,11 @@ export class ClaudeProvider implements LLMProvider {
     const message = data.content?.[0]?.text;
 
     if (!message) {
+      logger.error("Claude returned empty response");
       throw new Error("Claude returned empty response");
     }
 
-    console.log("✅ Response received from Claude");
-    console.log("📝 Generated message:", message.trim());
-
+    logger.debug("Response received from Claude");
     return message.trim();
   }
 }

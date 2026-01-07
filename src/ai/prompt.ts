@@ -38,7 +38,6 @@ Context:
 `;
   }
 
-  // Use truncated diff for large changes
   const changeDescription = summary?.isLarge
     ? `${contextInfo}\n\nDiff sample (truncated):\n${diff}`
     : `${contextInfo}\n\nFull diff:\n${diff}`;

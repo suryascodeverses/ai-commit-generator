@@ -1,4 +1,5 @@
 import * as vscode from "vscode";
+import { logger } from "../utils/logger";
 
 interface ConfigItem {
   label: string;
@@ -13,13 +14,18 @@ export class ConfigViewProvider implements vscode.TreeDataProvider<ConfigItem> {
   >();
   readonly onDidChangeTreeData = this._onDidChangeTreeData.event;
 
-  constructor(private context: vscode.ExtensionContext) {}
+  constructor(private context: vscode.ExtensionContext) {
+    logger.info("ConfigViewProvider initialized");
+  }
 
   refresh(): void {
+    logger.debug("Refreshing Config View...");
     this._onDidChangeTreeData.fire();
   }
 
   getTreeItem(element: ConfigItem): vscode.TreeItem {
+    logger.debug(`Rendering tree item: ${element.label}`);
+
     const treeItem = new vscode.TreeItem(element.label);
     treeItem.description = element.description;
     treeItem.tooltip = element.value || element.description;
@@ -31,7 +37,6 @@ export class ConfigViewProvider implements vscode.TreeDataProvider<ConfigItem> {
       };
     }
 
-    // Make items look clickable
     const iconMap: Record<string, string> = {
       "ai-commit-generator.setProvider": "symbol-interface",
       "ai-commit-generator.setApiKey": "key",
@@ -51,15 +56,24 @@ export class ConfigViewProvider implements vscode.TreeDataProvider<ConfigItem> {
       return [];
     }
 
+    logger.debug("Loading configuration items for tree view...");
+
     const config = vscode.workspace.getConfiguration("aiCommitGenerator");
     const provider = config.get<string>("provider") || "gemini";
     const model = config.get<string>("model") || "auto";
     const commitStyle = config.get<string>("commitStyle") || "concise";
     const maxLength = config.get<number>("maxLength") || 72;
 
-    // Check if API key is set
+    logger.debug(
+      `Current Settings => Provider: ${provider}, Model: ${model}, Style: ${commitStyle}, MaxLength: ${maxLength}`
+    );
+
     const apiKey = await this.context.secrets.get(`${provider}-api-key`);
     const apiKeyStatus = apiKey ? "✓ Set" : "✗ Not Set";
+
+    if (!apiKey) {
+      logger.warn(`No API key stored for provider: ${provider}`);
+    }
 
     return [
       {

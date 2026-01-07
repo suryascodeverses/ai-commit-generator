@@ -1,5 +1,6 @@
 import { LLMProvider, GenerateCommitOptions } from "../llm";
 import { buildCommitPrompt } from "../prompt";
+import { logger } from "../../utils/logger";
 
 export class DeepSeekProvider implements LLMProvider {
   readonly id = "deepseek";
@@ -9,13 +10,12 @@ export class DeepSeekProvider implements LLMProvider {
   async getAvailableModels(): Promise<
     Array<{ name: string; displayName: string }>
   > {
-    // DeepSeek has fixed models
     const models = [
       { name: "deepseek-chat", displayName: "DeepSeek Chat" },
       { name: "deepseek-coder", displayName: "DeepSeek Coder" },
     ];
 
-    console.log("📋 Available DeepSeek models:", models);
+    logger.debug(`Available DeepSeek models: ${models.length}`);
     return models;
   }
 
@@ -31,17 +31,15 @@ export class DeepSeekProvider implements LLMProvider {
 
     const model = options.model || "deepseek-chat";
 
-    console.log("🤖 Using model:", model);
-    console.log("✍️  Commit style:", options.style || "concise");
+    logger.info(`Using DeepSeek model: ${model}`);
 
     if (options.summary?.isLarge) {
-      console.log("⚡ Large changeset detected - using smart summary");
-      console.log(
-        `📊 ${options.summary.filesChanged} files, +${options.summary.insertions}/-${options.summary.deletions}`
+      logger.info(
+        `Processing large changeset: ${options.summary.filesChanged} files`
       );
     }
 
-    console.log("📤 Sending prompt to DeepSeek...");
+    logger.debug("Sending request to DeepSeek API...");
 
     const response = await fetch(
       "https://api.deepseek.com/v1/chat/completions",
@@ -67,6 +65,7 @@ export class DeepSeekProvider implements LLMProvider {
 
     if (!response.ok) {
       const error = await response.text();
+      logger.error("DeepSeek API request failed", error);
       throw new Error(`DeepSeek API error: ${error}`);
     }
 
@@ -74,12 +73,11 @@ export class DeepSeekProvider implements LLMProvider {
     const message = data.choices?.[0]?.message?.content;
 
     if (!message) {
+      logger.error("DeepSeek returned empty response");
       throw new Error("DeepSeek returned empty response");
     }
 
-    console.log("✅ Response received from DeepSeek");
-    console.log("📝 Generated message:", message.trim());
-
+    logger.debug("Response received from DeepSeek");
     return message.trim();
   }
 }

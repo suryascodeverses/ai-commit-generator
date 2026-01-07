@@ -1,5 +1,6 @@
 import { LLMProvider, GenerateCommitOptions } from "../llm";
 import { buildCommitPrompt } from "../prompt";
+import { logger } from "../../utils/logger";
 
 export class GeminiProvider implements LLMProvider {
   readonly id = "gemini";
@@ -32,7 +33,7 @@ export class GeminiProvider implements LLMProvider {
       }
     }
 
-    console.log("📋 Available Gemini models:", models);
+    logger.debug(`Available Gemini models: ${models.length}`);
     return models;
   }
 
@@ -43,7 +44,7 @@ export class GeminiProvider implements LLMProvider {
       throw new Error("No Gemini models available for this API key.");
     }
 
-    console.log("✅ Auto-selected model:", models[0].name);
+    logger.debug(`Auto-selected model: ${models[0].name}`);
     return models[0].name;
   }
 
@@ -60,17 +61,15 @@ export class GeminiProvider implements LLMProvider {
     const client = await this.getClient();
     const modelId = options.model || (await this.selectModel());
 
-    console.log("🤖 Using model:", modelId);
-    console.log("✍️  Commit style:", options.style || "concise");
+    logger.info(`Using Gemini model: ${modelId}`);
 
     if (options.summary?.isLarge) {
-      console.log("⚡ Large changeset detected - using smart summary");
-      console.log(
-        `📊 ${options.summary.filesChanged} files, +${options.summary.insertions}/-${options.summary.deletions}`
+      logger.info(
+        `Processing large changeset: ${options.summary.filesChanged} files`
       );
     }
 
-    console.log("📤 Sending prompt to Gemini...");
+    logger.debug("Sending request to Gemini API...");
 
     const result = await client.models.generateContent({
       model: modelId,
@@ -88,9 +87,7 @@ export class GeminiProvider implements LLMProvider {
       throw new Error("Gemini returned empty response.");
     }
 
-    console.log("✅ Response received from Gemini");
-    console.log("📝 Generated message:", text.trim());
-
+    logger.debug("Response received from Gemini");
     return text.trim();
   }
 }
