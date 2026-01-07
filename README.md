@@ -1,72 +1,207 @@
-# ai-commit-generator README
+# AI Commit Generator
 
-This is the README for your extension "ai-commit-generator". After writing up a brief description, we recommend including the following sections.
+🤖 Generate intelligent Git commit messages using AI - supports Gemini, OpenAI, Claude, and DeepSeek.
 
 ## Features
 
-Describe specific features of your extension including screenshots of your extension in action. Image paths are relative to this README file.
+- ✨ **Multiple AI Providers**: Choose from Gemini, OpenAI, Claude, or DeepSeek
+- 🎯 **Smart Diff Processing**: Handles large changesets efficiently
+- 🎨 **Multiple Styles**: GitHub Copilot style, Conventional Commits, or Detailed
+- 🔒 **Secure Storage**: API keys stored securely using VS Code secrets
+- ⚡ **Fast & Efficient**: Optimized for performance with intelligent truncation
+- 🎪 **Easy Configuration**: Simple sidebar UI for all settings
 
-For example if there is an image subfolder under your extension project workspace:
+## Installation
 
-\!\[feature X\]\(images/feature-x.png\)
+1. Install from VS Code Marketplace (coming soon)
+2. Or install from VSIX file:
+   ```bash
+   code --install-extension ai-commit-generator-0.0.1.vsix
+   ```
 
-> Tip: Many popular extensions utilize animations. This is an excellent way to show off your extension! We recommend short, focused animations that are easy to follow.
+## Quick Start
 
-## Requirements
+1. **Open the Configuration Panel**
+   - Click the AI Commit Generator icon in the activity bar (left sidebar)
 
-If you have any requirements or dependencies, add a section describing those and how to install and configure them.
+2. **Set Up Your Provider**
+   - Click "Provider" → Select your preferred AI provider
+   - Click "API Key" → Enter your API key
+   - Click "Model" → Choose a model (or use auto-select)
 
-## Extension Settings
+3. **Configure Commit Style**
+   - Click "Commit Style" → Choose your preferred style:
+     - **Concise** (like GitHub Copilot): "Add user authentication"
+     - **Conventional**: "feat: Add user authentication"
+     - **Detailed**: Multi-line with explanations
 
-Include if your extension adds any VS Code settings through the `contributes.configuration` extension point.
+4. **Generate Commits**
+   - Stage your changes in Git
+   - Click the ✨ sparkle button next to "Changes" in Source Control
+   - Review and commit!
 
-For example:
+## Getting Free API Keys
 
-This extension contributes the following settings:
+### 🔷 Google Gemini (Recommended for Free Tier)
+**Best for:** Development & Testing
+- **Free Tier**: 15 requests/minute, 1 million tokens/minute
+- **Sign up**: https://aistudio.google.com/apikey
+- **Steps**:
+  1. Go to Google AI Studio
+  2. Click "Get API key"
+  3. Create new API key
+  4. Copy and paste into extension
 
-* `myExtension.enable`: Enable/disable this extension.
-* `myExtension.thing`: Set to `blah` to do something.
+**Notes**: 
+- Free tier is generous for development
+- No credit card required
+- Rate limits are per-minute, not daily
 
-## Known Issues
+### 🔷 OpenAI
+**Best for:** Production use
+- **Free Credits**: $5 for new accounts (expires after 3 months)
+- **Sign up**: https://platform.openai.com/signup
+- **Steps**:
+  1. Create account at OpenAI Platform
+  2. Go to API Keys: https://platform.openai.com/api-keys
+  3. Create new secret key
+  4. Copy and paste into extension
 
-Calling out known issues can help limit users opening duplicate issues against your extension.
+**Notes**:
+- Requires phone verification
+- After free credits, pay-as-you-go pricing
+- Best model: `gpt-4o-mini` (cheapest)
 
-## Release Notes
+### 🔷 Anthropic Claude
+**Best for:** High-quality responses
+- **Free Credits**: $5 for new accounts
+- **Sign up**: https://console.anthropic.com/
+- **Steps**:
+  1. Create account at Anthropic Console
+  2. Go to API Keys
+  3. Create new key
+  4. Copy and paste into extension
 
-Users appreciate release notes as you update your extension.
+**Notes**:
+- Requires email verification
+- Free credits expire after 1 month
+- Best model: `claude-3-5-haiku-20241022` (cheapest)
 
-### 1.0.0
+### 🔷 DeepSeek
+**Best for:** Budget-friendly option
+- **Free Tier**: Available for testing
+- **Sign up**: https://platform.deepseek.com/
+- **Steps**:
+  1. Create account
+  2. Go to API Keys section
+  3. Generate new key
+  4. Copy and paste into extension
 
-Initial release of ...
+**Notes**:
+- Chinese AI provider
+- Very affordable pricing
+- Good for coding tasks
 
-### 1.0.1
+## Commit Styles
 
-Fixed issue #.
+### Concise (GitHub Copilot Style)
+```
+Add README and initial text file for project documentation
+Update user authentication logic in auth.ts
+Fix null pointer exception in payment handler
+Remove deprecated config files
+```
 
-### 1.1.0
+### Conventional Commits
+```
+feat: Add user authentication module
+fix: Resolve memory leak in cache handler
+docs: Update API documentation
+style: Format code with prettier
+refactor: Extract validation logic to utils
+```
 
-Added features X, Y, and Z.
+### Detailed
+```
+Add user authentication system
 
----
+- Implement JWT-based authentication
+- Add login and logout endpoints
+- Create middleware for token verification
+- Add tests for auth flows
+```
 
-## Following extension guidelines
+## Features in Detail
 
-Ensure that you've read through the extensions guidelines and follow the best practices for creating your extension.
+### Smart Diff Processing
+- Automatically detects large changesets (>200 lines or >5 files)
+- Creates intelligent summaries instead of sending full diffs
+- Identifies formatting-only changes
+- Handles file additions, modifications, and deletions
 
-* [Extension Guidelines](https://code.visualstudio.com/api/references/extension-guidelines)
+### Output Panel
+- View detailed logs of what's happening
+- See which model is being used
+- Monitor API responses
+- Debug errors easily
 
-## Working with Markdown
+### Configuration Management
+- Provider selection (Gemini, OpenAI, Claude, DeepSeek)
+- API key management (secure storage)
+- Model selection (with auto-detection for Gemini)
+- Commit style preferences
+- Maximum message length
 
-You can author your README using Visual Studio Code. Here are some useful editor keyboard shortcuts:
+## Commands
 
-* Split the editor (`Cmd+\` on macOS or `Ctrl+\` on Windows and Linux).
-* Toggle preview (`Shift+Cmd+V` on macOS or `Shift+Ctrl+V` on Windows and Linux).
-* Press `Ctrl+Space` (Windows, Linux, macOS) to see a list of Markdown snippets.
+- `AI Commit: Generate Commit Message` - Generate commit from staged changes
+- `AI Commit: Open Configuration` - Open configuration panel
+- `AI Commit: Set Provider` - Change AI provider
+- `AI Commit: Set API Key` - Update API key
+- `AI Commit: Set Model` - Choose AI model
+- `AI Commit: Set Commit Style` - Change commit message style
 
-## For more information
+## Keyboard Shortcuts
 
-* [Visual Studio Code's Markdown Support](http://code.visualstudio.com/docs/languages/markdown)
-* [Markdown Syntax Reference](https://help.github.com/articles/markdown-basics/)
+No default shortcuts, but you can add your own:
+1. `Ctrl+Shift+P` → "Preferences: Open Keyboard Shortcuts"
+2. Search for "AI Commit"
+3. Add your preferred shortcut
 
-**Enjoy!**AIza**
-SyByObj9Axx3-R_ovaPWB3RlHJfFPbfPApI
+## Troubleshooting
+
+### "Rate limit exceeded" or "Quota exceeded"
+- **Solution 1**: Wait 1 minute and try again
+- **Solution 2**: Switch to a different model
+- **Solution 3**: Try a different provider
+- **Solution 4**: Reduce the size of your changes (commit more frequently)
+
+### "No API key found"
+- Make sure you've set the API key for your selected provider
+- Click "API Key" in the configuration panel
+- The key is stored securely in VS Code secrets
+
+### "Git extension not found"
+- Make sure Git is installed on your system
+- Restart VS Code
+- Check that the Git extension is enabled
+
+### "No staged changes found"
+- Stage your changes first: `git add <files>`
+- Or use VS Code's Source Control panel to stage changes
+
+## Contributing
+
+Contributions are welcome! Please feel free to submit a Pull Request.
+
+## License
+
+MIT License - See LICENSE file for details
+
+## Credits
+
+Made with ❤️ for developers who want better commit messages
+
+## Support
+
+- **Issues**: https://github.com/suryascodeverses/ai-commit-generator/issues

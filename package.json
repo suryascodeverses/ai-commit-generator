@@ -1,13 +1,29 @@
 {
   "name": "ai-commit-generator",
-  "displayName": "ai-commit-generator",
-  "description": "Generate detailed Git commit messages from staged changes using AI",
+  "displayName": "AI Commit Generator",
+  "description": "Generate detailed Git commit messages from staged changes using AI (Gemini, OpenAI, Claude, DeepSeek)",
   "version": "0.0.1",
+  "publisher": "suryascodeverse",
+  "icon": "resources/icon.png",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/suryascodeverses/ai-commit-generator"
+  },
   "engines": {
     "vscode": "^1.107.0"
   },
   "categories": [
     "Other"
+  ],
+  "keywords": [
+    "git",
+    "commit",
+    "ai",
+    "gemini",
+    "openai",
+    "claude",
+    "deepseek",
+    "copilot"
   ],
   "activationEvents": [
     "onView:aiCommitConfig"
@@ -39,19 +55,23 @@
       },
       {
         "command": "ai-commit-generator.openConfig",
-        "title": "Open AI Commit Configuration"
+        "title": "AI Commit: Open Configuration"
       },
       {
         "command": "ai-commit-generator.setProvider",
-        "title": "Set AI Provider"
+        "title": "AI Commit: Set Provider"
       },
       {
         "command": "ai-commit-generator.setApiKey",
-        "title": "Set API Key"
+        "title": "AI Commit: Set API Key"
       },
       {
         "command": "ai-commit-generator.setModel",
-        "title": "Set Model"
+        "title": "AI Commit: Set Model"
+      },
+      {
+        "command": "ai-commit-generator.setCommitStyle",
+        "title": "AI Commit: Set Commit Style"
       }
     ],
     "menus": {
@@ -69,9 +89,9 @@
         "aiCommitGenerator.provider": {
           "type": "string",
           "enum": [
+            "gemini",
             "openai",
             "deepseek",
-            "gemini",
             "claude"
           ],
           "default": "gemini",
@@ -86,13 +106,13 @@
           "type": "string",
           "enum": [
             "concise",
-            "detailed",
-            "conventional"
+            "conventional",
+            "detailed"
           ],
           "default": "concise",
           "enumDescriptions": [
-            "GitHub Copilot style - Natural language without prefixes (Add, Update, Fix, Remove...)",
-            "Conventional commits with type prefixes (feat:, fix:, docs:, etc.)",
+            "GitHub Copilot style - Natural language without prefixes",
+            "Conventional commits with type prefixes (feat:, fix:, etc.)",
             "Detailed multi-line commits with explanations"
           ],
           "description": "Style of commit messages to generate"
